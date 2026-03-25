@@ -8,4 +8,5 @@
     <string name="saved_count">Saved: %d items</string>
     <string name="recent_texts_title">Recent %d items:\n</string>
     <string name="no_data">(No data)</string>
+    <string name="db_size">Database size: %1$s</string>
 </resources>

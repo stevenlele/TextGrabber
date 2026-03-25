@@ -1,3 +1,5 @@
+// 可能是antigravity写的
+// 小红书app浏览记录这里无障碍确实是获取不到
 package com.screen.textgrabber;
 
 import android.content.Context;
@@ -22,9 +24,11 @@ public class MainActivity extends AppCompatActivity {
     private SharedPreferences sp; // 用于保存开关状态
     private android.widget.TextView tvCounter; // 显示保存计数
     private android.widget.TextView tvRecentTexts; // 显示最近的文本
+    private android.widget.TextView tvDbSize; // 显示数据库大小
     private android.os.Handler handler; // 用于定时更新计数
     private Runnable updateCounterRunnable; // 更新计数的任务
     private Runnable updateRecentTextsRunnable; // 更新最近文本的任务
+    private Runnable updateDbSizeRunnable; // 更新数据库大小的任务
     private DBManager dbManager; // 数据库管理器
 
     @Override
@@ -37,6 +41,7 @@ public class MainActivity extends AppCompatActivity {
         toggleSwitch = findViewById(R.id.btn_toggle);
         tvCounter = findViewById(R.id.tv_counter);
         tvRecentTexts = findViewById(R.id.tv_recent_texts);
+        tvDbSize = findViewById(R.id.tv_db_size);
         
         // 初始化数据库管理器
         dbManager = new DBManager(this);
@@ -56,6 +61,14 @@ public class MainActivity extends AppCompatActivity {
             public void run() {
                 updateRecentTexts();
                 handler.postDelayed(this, 5000); // 每 5000ms 更新一次
+            }
+        };
+        
+        updateDbSizeRunnable = new Runnable() {
+            @Override
+            public void run() {
+                updateDbSize();
+                handler.postDelayed(this, 10000); // 每 10000ms 更新一次
             }
         };
         Toast.makeText(this, "TextGrabber 服务已启动", Toast.LENGTH_SHORT).show();
@@ -94,6 +107,8 @@ public class MainActivity extends AppCompatActivity {
         handler.post(updateCounterRunnable);
         // 开始定时更新最近文本
         handler.post(updateRecentTextsRunnable);
+        // 开始定时更新数据库大小
+        handler.post(updateDbSizeRunnable);
     }
 
     @Override
@@ -102,6 +117,7 @@ public class MainActivity extends AppCompatActivity {
         // 停止定时更新
         handler.removeCallbacks(updateCounterRunnable);
         handler.removeCallbacks(updateRecentTextsRunnable);
+        handler.removeCallbacks(updateDbSizeRunnable);
     }
 
     /**
@@ -117,9 +133,9 @@ public class MainActivity extends AppCompatActivity {
      */
     private void updateRecentTexts() {
         new Thread(() -> {
-            java.util.List<String> recentTexts = dbManager.getRecentTexts(30);
+            java.util.List<String> recentTexts = dbManager.getRecentTexts(50);
             
-            StringBuilder sb = new StringBuilder(getString(R.string.recent_texts_title, 30));
+            StringBuilder sb = new StringBuilder(getString(R.string.recent_texts_title, 50));
             if (recentTexts.isEmpty()) {
                 sb.append(getString(R.string.no_data));
             } else {
@@ -136,6 +152,32 @@ public class MainActivity extends AppCompatActivity {
             final String displayText = sb.toString();
             runOnUiThread(() -> tvRecentTexts.setText(displayText));
         }).start();
+    }
+
+    /**
+     * 更新数据库大小显示（基于数据库文件大小）
+     */
+    private void updateDbSize() {
+        try {
+            java.io.File dbFile = getDatabasePath(dbManager.getDatabaseName());
+            long sizeBytes = (dbFile != null && dbFile.exists()) ? dbFile.length() : 0L;
+            tvDbSize.setText(getString(R.string.db_size, formatBytes(sizeBytes)));
+        } catch (Exception e) {
+            Log.e("MainActivity", "Failed to update db size", e);
+            tvDbSize.setText(getString(R.string.db_size, "N/A"));
+        }
+    }
+
+    private String formatBytes(long bytes) {
+        if (bytes <= 0) return "0 B";
+
+        final String[] units = {"B", "KB", "MB", "GB", "TB"};
+        int digitGroups = (int) (Math.log10((double) bytes) / Math.log10(1024));
+        if (digitGroups < 0) digitGroups = 0;
+        if (digitGroups >= units.length) digitGroups = units.length - 1;
+
+        double value = bytes / Math.pow(1024, digitGroups);
+        return String.format(java.util.Locale.US, "%.1f %s", value, units[digitGroups]);
     }
 
     /**

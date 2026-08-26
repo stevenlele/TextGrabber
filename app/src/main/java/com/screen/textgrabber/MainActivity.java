@@ -25,6 +25,9 @@ public class MainActivity extends AppCompatActivity {
     private android.widget.TextView tvCounter; // 显示保存计数
     private android.widget.TextView tvRecentTexts; // 显示最近的文本
     private android.widget.TextView tvDbSize; // 显示数据库大小
+    private android.widget.EditText etSearch; // 搜索输入框
+    private android.widget.Button btnSearch; // 搜索按钮
+    private android.widget.TextView tvSearchResults; // 显示搜索结果
     private android.os.Handler handler; // 用于定时更新计数
     private Runnable updateCounterRunnable; // 更新计数的任务
     private Runnable updateRecentTextsRunnable; // 更新最近文本的任务
@@ -42,6 +45,9 @@ public class MainActivity extends AppCompatActivity {
         tvCounter = findViewById(R.id.tv_counter);
         tvRecentTexts = findViewById(R.id.tv_recent_texts);
         tvDbSize = findViewById(R.id.tv_db_size);
+        etSearch = findViewById(R.id.et_search);
+        btnSearch = findViewById(R.id.btn_search);
+        tvSearchResults = findViewById(R.id.tv_search_results);
         
         // 初始化数据库管理器
         dbManager = new DBManager(this);
@@ -98,6 +104,15 @@ public class MainActivity extends AppCompatActivity {
                 startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS));
             }
         });
+
+        btnSearch.setOnClickListener(v -> performSearch());
+        etSearch.setOnEditorActionListener((v, actionId, event) -> {
+            if (actionId == android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH) {
+                performSearch();
+                return true;
+            }
+            return false;
+        });
     }
 
     @Override
@@ -151,6 +166,37 @@ public class MainActivity extends AppCompatActivity {
             
             final String displayText = sb.toString();
             runOnUiThread(() -> tvRecentTexts.setText(displayText));
+        }).start();
+    }
+
+    /**
+     * 按关键词搜索 content 列并展示结果
+     */
+    private void performSearch() {
+        final String keyword = etSearch.getText() != null ? etSearch.getText().toString().trim() : "";
+        if (keyword.isEmpty()) {
+            Toast.makeText(this, R.string.search_empty_keyword, Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        new Thread(() -> {
+            java.util.List<String> results = dbManager.searchByContent(keyword, 50);
+
+            StringBuilder sb = new StringBuilder(getString(R.string.search_results_title, results.size()));
+            if (results.isEmpty()) {
+                sb.append(getString(R.string.no_data));
+            } else {
+                for (int i = 0; i < results.size(); i++) {
+                    String text = results.get(i);
+                    if (text != null && text.length() > 50) {
+                        text = text.substring(0, 50) + "...";
+                    }
+                    sb.append((i + 1)).append(". ").append(text).append("\n");
+                }
+            }
+
+            final String displayText = sb.toString();
+            runOnUiThread(() -> tvSearchResults.setText(displayText));
         }).start();
     }
 

@@ -111,4 +111,39 @@ public class DBManager extends SQLiteOpenHelper {
         cursor.close();
         return texts;
     }
+
+    /**
+     * 按 content 列模糊搜索文本记录
+     *
+     * @param keyword 搜索关键词
+     * @param limit   返回的记录数量
+     * @return 匹配的文本内容列表
+     */
+    public java.util.List<String> searchByContent(String keyword, int limit) {
+        java.util.List<String> texts = new java.util.ArrayList<>();
+        if (keyword == null || keyword.trim().isEmpty()) {
+            return texts;
+        }
+
+        SQLiteDatabase db = this.getReadableDatabase();
+        android.database.Cursor cursor = db.query(
+            TABLE_NAME,
+            new String[]{COLUMN_CONTENT},
+            COLUMN_CONTENT + " LIKE ?",
+            new String[]{"%" + keyword.trim() + "%"},
+            null,
+            null,
+            COLUMN_CAPTURE_TIME + " DESC",
+            String.valueOf(limit)
+        );
+
+        if (cursor.moveToFirst()) {
+            do {
+                texts.add(cursor.getString(0));
+            } while (cursor.moveToNext());
+        }
+
+        cursor.close();
+        return texts;
+    }
 }

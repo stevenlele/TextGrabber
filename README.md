@@ -7,7 +7,7 @@
 ## English
 
 ### Overview
-TextGrabber is an Android application that automatically captures and stores all visible text on your screen using Android's Accessibility Service API. It features intelligent deduplication, local SQLite storage, and a real-time statistics dashboard.
+TextGrabber is an Android application that captures visible screen text using Android's Accessibility Service API. Captures are grouped into projects, stored locally in SQLite, and can be exported as TXT files.
 
 ### Features
 - 🔍 **Automatic Text Capture**: Monitors screen content changes and extracts text from all visible UI elements
@@ -50,8 +50,8 @@ You can inspect the captured data using Android Studio's Database Inspector:
 git clone https://github.com/yourusername/TextGrabber.git
 cd TextGrabber
 
-# Build debug APK
-./gradlew assembleDebug
+# Build debug APK with Gradle 8.2
+gradle assembleDebug
 
 # Output: app/build/outputs/apk/debug/app-debug.apk
 ```
@@ -85,7 +85,7 @@ This project is licensed under the MIT License.
 ## 中文
 
 ### 项目简介
-TextGrabber 是一个 Android 应用程序，使用 Android 无障碍服务 API 自动捕获并存储屏幕上的所有可见文本。具备智能去重、本地 SQLite 存储和实时统计面板等功能。
+TextGrabber 是一个 Android 应用程序，使用 Android 无障碍服务 API 捕获屏幕上的可见文本。记录按项目分类并保存在本地 SQLite 数据库中，也可导出为 TXT 文件。
 
 ### 主要功能
 - 🔍 **自动文本抓取**：监控屏幕内容变化，提取所有可见 UI 元素的文本
@@ -128,8 +128,8 @@ TextGrabber 是一个 Android 应用程序，使用 Android 无障碍服务 API 
 git clone https://github.com/yourusername/TextGrabber.git
 cd TextGrabber
 
-# 构建 debug APK
-./gradlew assembleDebug
+# 使用 Gradle 8.2 构建 debug APK
+gradle assembleDebug
 
 # 输出位置: app/build/outputs/apk/debug/app-debug.apk
 ```

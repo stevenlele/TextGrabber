@@ -14,18 +14,13 @@ public class MyAccessibilityService extends AccessibilityService {
 
     private boolean isFunctionEnabled = false; // 功能开关状态
     private DBManager dbManager; // 数据库管理器
-    private DeduplicationLogic deduplicationLogic; // 去重逻辑
     private long lastProcessTime = 0; // 上次处理时间
     private static final long PROCESS_INTERVAL = 500; // 节流间隔 (毫秒)，防止处理过于频繁
-    private int savedCount = 0; // 本次启动保存的文本数量
 
     @Override
     public void onCreate() {
         super.onCreate();
         Log.d("MyAccessibilityService", "onCreate: Service created");
-        // 重置计数器
-        savedCount = 0;
-        getSharedPreferences("app_config", MODE_PRIVATE).edit().putInt("saved_count", 0).apply();
     }
 
     @Override
@@ -37,9 +32,13 @@ public class MyAccessibilityService extends AccessibilityService {
         
         // 初始化组件
         dbManager = new DBManager(this);
-        deduplicationLogic = new DeduplicationLogic();
         // 读取初始开关状态
         SharedPreferences sp = getSharedPreferences("app_config", MODE_PRIVATE);
+        long projectId = sp.getLong("active_project_id", -1L);
+        if (projectId < 0) {
+            projectId = dbManager.ensureDefaultProject("Default project");
+            sp.edit().putLong("active_project_id", projectId).apply();
+        }
         isFunctionEnabled = sp.getBoolean("is_active", false);
         Log.d("MyAccessibilityService", "Initial function enabled state: " + isFunctionEnabled);
     }
@@ -119,22 +118,17 @@ public class MyAccessibilityService extends AccessibilityService {
             return;
         }
 
-        // 生成唯一键
-        String uniqueKey = deduplicationLogic.generateKey(packageName, viewId, content);
-
-        // 检查是否重复
-        if (deduplicationLogic.isDuplicate(uniqueKey)) {
-            return;
-        }
         // log
         Log.d("MyAccessibilityService", "Processing text: " + content);
 
         // 保存到数据库
-        dbManager.insertText(content, packageName, viewId, System.currentTimeMillis(), uniqueKey);
-        
-        // 增加计数并保存到 SharedPreferences
-        savedCount++;
-        getSharedPreferences("app_config", MODE_PRIVATE).edit().putInt("saved_count", savedCount).apply();
+        SharedPreferences sp = getSharedPreferences("app_config", MODE_PRIVATE);
+        long projectId = sp.getLong("active_project_id", -1L);
+        if (projectId < 0) {
+            projectId = dbManager.ensureDefaultProject("Default project");
+            sp.edit().putLong("active_project_id", projectId).apply();
+        }
+        dbManager.insertText(content, packageName, viewId, System.currentTimeMillis(), projectId);
     }
 
     @Override

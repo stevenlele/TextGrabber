@@ -14,4 +14,12 @@
     <string name="search_results_title">Search results (%d):\n</string>
     <string name="search_results_placeholder">Search results:\n(Enter a keyword and tap Search)</string>
     <string name="search_empty_keyword">Please enter a search keyword</string>
+    <string name="default_project">Default project</string>
+    <string name="new_project">New project</string>
+    <string name="create">Create</string>
+    <string name="project_name_empty">Project name cannot be empty</string>
+    <string name="project_create_failed">Could not create project</string>
+    <string name="export_txt">Save TXT</string>
+    <string name="export_success">TXT file saved</string>
+    <string name="export_failed">Could not save TXT file</string>
 </resources>

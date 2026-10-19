@@ -195,8 +195,9 @@ public class MainActivity extends AppCompatActivity {
      * 更新最近文本显示
      */
     private void updateRecentTexts() {
+        long projectId = selectedProjectId;
         new Thread(() -> {
-            java.util.List<String> recentTexts = dbManager.getTextsForProject(selectedProjectId);
+            java.util.List<String> recentTexts = dbManager.getTextsForProject(projectId);
             
             StringBuilder sb = new StringBuilder(getString(R.string.recent_texts_title, recentTexts.size()));
             if (recentTexts.isEmpty()) {
@@ -223,8 +224,9 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
 
+        long projectId = selectedProjectId;
         new Thread(() -> {
-            java.util.List<String> results = dbManager.searchByContent(keyword, selectedProjectId);
+            java.util.List<String> results = dbManager.searchByContent(keyword, projectId);
 
             StringBuilder sb = new StringBuilder(getString(R.string.search_results_title, results.size()));
             if (results.isEmpty()) {
@@ -234,89 +236,89 @@ public class MainActivity extends AppCompatActivity {
                     String text = results.get(i);
                     sb.append((i + 1)).append(". ").append(text).append("\n");
                 }
-
-                private void showCreateProjectDialog() {
-                    EditText input = new EditText(this);
-                    input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
-                    new androidx.appcompat.app.AlertDialog.Builder(this)
-                            .setTitle(R.string.new_project)
-                            .setView(input)
-                            .setNegativeButton(android.R.string.cancel, null)
-                            .setPositiveButton(R.string.create, (dialog, which) -> {
-                                String name = input.getText().toString().trim();
-                                if (name.isEmpty()) {
-                                    Toast.makeText(this, R.string.project_name_empty, Toast.LENGTH_SHORT).show();
-                                    return;
-                                }
-                                long projectId = dbManager.createProject(name);
-                                if (projectId < 0) {
-                                    Toast.makeText(this, R.string.project_create_failed, Toast.LENGTH_SHORT).show();
-                                    return;
-                                }
-                                selectedProjectId = projectId;
-                                sp.edit().putLong("active_project_id", projectId).apply();
-                                projectAdapter.clear();
-                                projectAdapter.addAll(dbManager.getProjects());
-                                projectAdapter.notifyDataSetChanged();
-                                selectProjectInSpinner(projectId);
-                                updateRecentTexts();
-                                updateCounter();
-                            })
-                            .show();
-                }
-
-                private void selectProjectInSpinner(long projectId) {
-                    for (int i = 0; i < projectAdapter.getCount(); i++) {
-                        DBManager.Project project = projectAdapter.getItem(i);
-                        if (project != null && project.id == projectId) {
-                            spProjects.setSelection(i);
-                            return;
-                        }
-                    }
-                }
-
-                private String getExportFileName() {
-                    DBManager.Project project = getSelectedProject();
-                    String name = project == null ? getString(R.string.default_project) : project.name;
-                    return name.replaceAll("[\\\\/:*?\"<>|]", "_") + ".txt";
-                }
-
-                private DBManager.Project getSelectedProject() {
-                    for (int i = 0; i < projectAdapter.getCount(); i++) {
-                        DBManager.Project project = projectAdapter.getItem(i);
-                        if (project != null && project.id == selectedProjectId) {
-                            return project;
-                        }
-                    }
-                    return null;
-                }
-
-                private void exportProject(Uri uri) {
-                    if (uri == null) {
-                        return;
-                    }
-                    long projectId = selectedProjectId;
-                    new Thread(() -> {
-                        try (java.io.OutputStream outputStream = getContentResolver().openOutputStream(uri);
-                             java.io.OutputStreamWriter writer = new java.io.OutputStreamWriter(
-                                     outputStream, java.nio.charset.StandardCharsets.UTF_8)) {
-                            for (String text : dbManager.getTextsForProject(projectId)) {
-                                writer.write(text == null ? "" : text);
-                                writer.write(System.lineSeparator());
-                            }
-                            runOnUiThread(() ->
-                                    Toast.makeText(this, R.string.export_success, Toast.LENGTH_SHORT).show());
-                        } catch (Exception e) {
-                            Log.e("MainActivity", "Failed to export project", e);
-                            runOnUiThread(() ->
-                                    Toast.makeText(this, R.string.export_failed, Toast.LENGTH_SHORT).show());
-                        }
-                    }).start();
-                }
             }
 
             final String displayText = sb.toString();
             runOnUiThread(() -> tvSearchResults.setText(displayText));
+        }).start();
+    }
+
+    private void showCreateProjectDialog() {
+        EditText input = new EditText(this);
+        input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
+        new androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle(R.string.new_project)
+                .setView(input)
+                .setNegativeButton(android.R.string.cancel, null)
+                .setPositiveButton(R.string.create, (dialog, which) -> {
+                    String name = input.getText().toString().trim();
+                    if (name.isEmpty()) {
+                        Toast.makeText(this, R.string.project_name_empty, Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    long projectId = dbManager.createProject(name);
+                    if (projectId < 0) {
+                        Toast.makeText(this, R.string.project_create_failed, Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    selectedProjectId = projectId;
+                    sp.edit().putLong("active_project_id", projectId).apply();
+                    projectAdapter.clear();
+                    projectAdapter.addAll(dbManager.getProjects());
+                    projectAdapter.notifyDataSetChanged();
+                    selectProjectInSpinner(projectId);
+                    updateRecentTexts();
+                    updateCounter();
+                })
+                .show();
+    }
+
+    private void selectProjectInSpinner(long projectId) {
+        for (int i = 0; i < projectAdapter.getCount(); i++) {
+            DBManager.Project project = projectAdapter.getItem(i);
+            if (project != null && project.id == projectId) {
+                spProjects.setSelection(i);
+                return;
+            }
+        }
+    }
+
+    private String getExportFileName() {
+        DBManager.Project project = getSelectedProject();
+        String name = project == null ? getString(R.string.default_project) : project.name;
+        return name.replaceAll("[\\\\/:*?\"<>|]", "_") + ".txt";
+    }
+
+    private DBManager.Project getSelectedProject() {
+        for (int i = 0; i < projectAdapter.getCount(); i++) {
+            DBManager.Project project = projectAdapter.getItem(i);
+            if (project != null && project.id == selectedProjectId) {
+                return project;
+            }
+        }
+        return null;
+    }
+
+    private void exportProject(Uri uri) {
+        if (uri == null) {
+            return;
+        }
+        long projectId = selectedProjectId;
+        new Thread(() -> {
+            try (java.io.OutputStream outputStream = getContentResolver().openOutputStream(uri);
+                 java.io.OutputStreamWriter writer = new java.io.OutputStreamWriter(
+                         outputStream, java.nio.charset.StandardCharsets.UTF_8)) {
+                for (String text : dbManager.getTextsForProject(projectId)) {
+                    writer.write(text == null ? "" : text);
+                    writer.write(System.lineSeparator());
+                }
+                runOnUiThread(() ->
+                        Toast.makeText(this, R.string.export_success, Toast.LENGTH_SHORT).show());
+            } catch (Exception e) {
+                Log.e("MainActivity", "Failed to export project", e);
+                runOnUiThread(() ->
+                        Toast.makeText(this, R.string.export_failed, Toast.LENGTH_SHORT).show());
+            }
         }).start();
     }
 

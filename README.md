@@ -11,9 +11,11 @@ TextGrabber is an Android application that automatically captures and stores all
 
 ### Features
 - 🔍 **Automatic Text Capture**: Monitors screen content changes and extracts text from all visible UI elements
-- 🧠 **Smart Deduplication**: Dual-layer deduplication using LRU cache (400 entries) + database UNIQUE constraints
+- 🗂️ **Project-based Capture**: Create projects and keep every captured text item grouped by project
+- ♾️ **Complete Capture History**: Repeated text is preserved and project history has no item-count cap
+- 📄 **TXT Export**: Save the selected project's captured text as a UTF-8 text file
 - 💾 **Local Storage**: SQLite database for persistent text storage
-- 📊 **Real-time Dashboard**: Live counter and recent 30 items display
+- 📊 **Real-time Dashboard**: Live per-project counter and scrollable capture history
 - 🌍 **Internationalization**: Supports English and Chinese (auto-detected)
 - 🚫 **Self-Exclusion**: Automatically excludes capturing text from TextGrabber itself
 - 🎯 **ViewID Tracking**: Captures Android View resource IDs for better context
@@ -31,9 +33,9 @@ TextGrabber is an Android application that automatically captures and stores all
 
 ### Usage
 1. **Enable Service**: Turn on the toggle switch in the main interface
-2. **Navigate to other apps**: The service will automatically capture text as you scroll/interact
-3. **View Statistics**: Real-time counter shows total saved items
-4. **Browse Recent Captures**: Scrollable list displays the most recent 30 text entries
+2. **Create or select a project**: Captures are saved into the selected project
+3. **Navigate to other apps**: The service captures text as you scroll/interact
+4. **Browse or export captures**: Review the full scrollable project history or tap **Save TXT**
 
 ### Database Inspection
 You can inspect the captured data using Android Studio's Database Inspector:
@@ -54,12 +56,13 @@ cd TextGrabber
 # Output: app/build/outputs/apk/debug/app-debug.apk
 ```
 
+You can also run the **Build APK** GitHub Actions workflow manually from the Actions tab. The debug APK is uploaded as the `textgrabber-debug-apk` artifact.
+
 ### Architecture
 ```
 MyAccessibilityService (Core)
     ├─ Event Listening (typeAllMask)
     ├─ Node Traversal (Recursive)
-    ├─ DeduplicationLogic (LRU Cache: 400)
     └─ DBManager (SQLite)
 
 MainActivity (UI)
@@ -86,9 +89,11 @@ TextGrabber 是一个 Android 应用程序，使用 Android 无障碍服务 API 
 
 ### 主要功能
 - 🔍 **自动文本抓取**：监控屏幕内容变化，提取所有可见 UI 元素的文本
-- 🧠 **智能去重**：双层去重机制（LRU 缓存 400 条 + 数据库唯一约束）
+- 🗂️ **项目分类**：创建多个项目，将抓取到的文本分别保存
+- ♾️ **完整记录**：保留重复文本，不限制每个项目的条目数量
+- 📄 **TXT 导出**：将当前项目的文本保存为 UTF-8 文本文件
 - 💾 **本地存储**：使用 SQLite 数据库持久化存储文本
-- 📊 **实时统计面板**：实时计数器和最近 30 条记录展示
+- 📊 **实时统计面板**：显示当前项目计数和可滚动的完整记录
 - 🌍 **国际化支持**：支持中英文（自动检测系统语言）
 - 🚫 **自我排除**：自动排除抓取 TextGrabber 自身的文本
 - 🎯 **ViewID 追踪**：捕获 Android 视图资源 ID，提供更好的上下文信息
@@ -106,9 +111,9 @@ TextGrabber 是一个 Android 应用程序，使用 Android 无障碍服务 API 
 
 ### 使用说明
 1. **启用服务**：在主界面打开开关
-2. **浏览其他应用**：服务会自动在你滚动/交互时抓取文本
-3. **查看统计**：实时计数器显示已保存的总条目数
-4. **浏览最近记录**：可滚动列表显示最近 30 条文本条目
+2. **创建或选择项目**：抓取内容会保存到当前选中的项目
+3. **浏览其他应用**：服务会自动在你滚动/交互时抓取文本
+4. **查看或导出记录**：滚动查看项目中的全部内容，或点击“保存 TXT”
 
 ### 数据库查看
 可以使用 Android Studio 的 Database Inspector 查看捕获的数据：
@@ -129,12 +134,13 @@ cd TextGrabber
 # 输出位置: app/build/outputs/apk/debug/app-debug.apk
 ```
 
+也可以在 GitHub Actions 页面手动运行 **Build APK** 工作流，构建的 APK 会作为 `textgrabber-debug-apk` artifact 上传。
+
 ### 架构设计
 ```
 MyAccessibilityService (核心)
     ├─ 事件监听 (typeAllMask)
     ├─ 节点遍历 (递归)
-    ├─ DeduplicationLogic (LRU 缓存: 400)
     └─ DBManager (SQLite)
 
 MainActivity (UI)

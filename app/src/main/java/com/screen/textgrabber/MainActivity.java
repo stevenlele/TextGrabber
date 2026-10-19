@@ -8,10 +8,17 @@ import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.provider.Settings;
 import android.text.TextUtils;
+import android.text.InputType;
+import android.net.Uri;
+import android.widget.ArrayAdapter;
+import android.widget.EditText;
+import android.widget.Spinner;
 import android.widget.Switch;
 import android.widget.Toast;
 import android.util.Log;
 
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AppCompatActivity;
 
 /**
@@ -28,11 +35,17 @@ public class MainActivity extends AppCompatActivity {
     private android.widget.EditText etSearch; // 搜索输入框
     private android.widget.Button btnSearch; // 搜索按钮
     private android.widget.TextView tvSearchResults; // 显示搜索结果
+    private Spinner spProjects;
+    private android.widget.Button btnNewProject;
+    private android.widget.Button btnExport;
     private android.os.Handler handler; // 用于定时更新计数
     private Runnable updateCounterRunnable; // 更新计数的任务
     private Runnable updateRecentTextsRunnable; // 更新最近文本的任务
     private Runnable updateDbSizeRunnable; // 更新数据库大小的任务
     private DBManager dbManager; // 数据库管理器
+    private ArrayAdapter<DBManager.Project> projectAdapter;
+    private long selectedProjectId = -1L;
+    private ActivityResultLauncher<String> exportLauncher;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -48,9 +61,44 @@ public class MainActivity extends AppCompatActivity {
         etSearch = findViewById(R.id.et_search);
         btnSearch = findViewById(R.id.btn_search);
         tvSearchResults = findViewById(R.id.tv_search_results);
+        spProjects = findViewById(R.id.sp_projects);
+        btnNewProject = findViewById(R.id.btn_new_project);
+        btnExport = findViewById(R.id.btn_export);
         
         // 初始化数据库管理器
         dbManager = new DBManager(this);
+        long defaultProjectId = dbManager.ensureDefaultProject(getString(R.string.default_project));
+        selectedProjectId = sp.getLong("active_project_id", defaultProjectId);
+        if (dbManager.getProjects().stream().noneMatch(project -> project.id == selectedProjectId)) {
+            selectedProjectId = defaultProjectId;
+        }
+        sp.edit().putLong("active_project_id", selectedProjectId).apply();
+        projectAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item,
+                dbManager.getProjects());
+        projectAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        spProjects.setAdapter(projectAdapter);
+        selectProjectInSpinner(selectedProjectId);
+        spProjects.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(android.widget.AdapterView<?> parent,
+                                       android.view.View view, int position, long id) {
+                DBManager.Project project = projectAdapter.getItem(position);
+                if (project != null && project.id != selectedProjectId) {
+                    selectedProjectId = project.id;
+                    sp.edit().putLong("active_project_id", selectedProjectId).apply();
+                    updateRecentTexts();
+                    updateCounter();
+                }
+            }
+
+            @Override
+            public void onNothingSelected(android.widget.AdapterView<?> parent) {
+            }
+        });
+        btnNewProject.setOnClickListener(v -> showCreateProjectDialog());
+        exportLauncher = registerForActivityResult(
+                new ActivityResultContracts.CreateDocument("text/plain"), this::exportProject);
+        btnExport.setOnClickListener(v -> exportLauncher.launch(getExportFileName()));
 
         // 初始化 Handler
         handler = new android.os.Handler();
@@ -139,7 +187,7 @@ public class MainActivity extends AppCompatActivity {
      * 更新计数显示
      */
     private void updateCounter() {
-        int count = sp.getInt("saved_count", 0);
+        long count = dbManager.getTextCount(selectedProjectId);
         tvCounter.setText(getString(R.string.saved_count, count));
     }
 
@@ -147,19 +195,16 @@ public class MainActivity extends AppCompatActivity {
      * 更新最近文本显示
      */
     private void updateRecentTexts() {
+        long projectId = selectedProjectId;
         new Thread(() -> {
-            java.util.List<String> recentTexts = dbManager.getRecentTexts(50);
+            java.util.List<String> recentTexts = dbManager.getTextsForProject(projectId);
             
-            StringBuilder sb = new StringBuilder(getString(R.string.recent_texts_title, 50));
+            StringBuilder sb = new StringBuilder(getString(R.string.recent_texts_title, recentTexts.size()));
             if (recentTexts.isEmpty()) {
                 sb.append(getString(R.string.no_data));
             } else {
                 for (int i = 0; i < recentTexts.size(); i++) {
                     String text = recentTexts.get(i);
-                    // 截断过长的文本
-                    if (text.length() > 50) {
-                        text = text.substring(0, 50) + "...";
-                    }
                     sb.append((i + 1)).append(". ").append(text).append("\n");
                 }
             }
@@ -179,8 +224,9 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
 
+        long projectId = selectedProjectId;
         new Thread(() -> {
-            java.util.List<String> results = dbManager.searchByContent(keyword, 50);
+            java.util.List<String> results = dbManager.searchByContent(keyword, projectId);
 
             StringBuilder sb = new StringBuilder(getString(R.string.search_results_title, results.size()));
             if (results.isEmpty()) {
@@ -188,15 +234,91 @@ public class MainActivity extends AppCompatActivity {
             } else {
                 for (int i = 0; i < results.size(); i++) {
                     String text = results.get(i);
-                    if (text != null && text.length() > 50) {
-                        text = text.substring(0, 50) + "...";
-                    }
                     sb.append((i + 1)).append(". ").append(text).append("\n");
                 }
             }
 
             final String displayText = sb.toString();
             runOnUiThread(() -> tvSearchResults.setText(displayText));
+        }).start();
+    }
+
+    private void showCreateProjectDialog() {
+        EditText input = new EditText(this);
+        input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
+        new androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle(R.string.new_project)
+                .setView(input)
+                .setNegativeButton(android.R.string.cancel, null)
+                .setPositiveButton(R.string.create, (dialog, which) -> {
+                    String name = input.getText().toString().trim();
+                    if (name.isEmpty()) {
+                        Toast.makeText(this, R.string.project_name_empty, Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    long projectId = dbManager.createProject(name);
+                    if (projectId < 0) {
+                        Toast.makeText(this, R.string.project_create_failed, Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    selectedProjectId = projectId;
+                    sp.edit().putLong("active_project_id", projectId).apply();
+                    projectAdapter.clear();
+                    projectAdapter.addAll(dbManager.getProjects());
+                    projectAdapter.notifyDataSetChanged();
+                    selectProjectInSpinner(projectId);
+                    updateRecentTexts();
+                    updateCounter();
+                })
+                .show();
+    }
+
+    private void selectProjectInSpinner(long projectId) {
+        for (int i = 0; i < projectAdapter.getCount(); i++) {
+            DBManager.Project project = projectAdapter.getItem(i);
+            if (project != null && project.id == projectId) {
+                spProjects.setSelection(i);
+                return;
+            }
+        }
+    }
+
+    private String getExportFileName() {
+        DBManager.Project project = getSelectedProject();
+        String name = project == null ? getString(R.string.default_project) : project.name;
+        return name.replaceAll("[\\\\/:*?\"<>|]", "_") + ".txt";
+    }
+
+    private DBManager.Project getSelectedProject() {
+        for (int i = 0; i < projectAdapter.getCount(); i++) {
+            DBManager.Project project = projectAdapter.getItem(i);
+            if (project != null && project.id == selectedProjectId) {
+                return project;
+            }
+        }
+        return null;
+    }
+
+    private void exportProject(Uri uri) {
+        if (uri == null) {
+            return;
+        }
+        long projectId = selectedProjectId;
+        new Thread(() -> {
+            try (java.io.OutputStream outputStream = getContentResolver().openOutputStream(uri);
+                 java.io.OutputStreamWriter writer = new java.io.OutputStreamWriter(
+                         outputStream, java.nio.charset.StandardCharsets.UTF_8)) {
+                for (String text : dbManager.getTextsForProject(projectId)) {
+                    writer.write(text == null ? "" : text);
+                    writer.write(System.lineSeparator());
+                }
+                runOnUiThread(() ->
+                        Toast.makeText(this, R.string.export_success, Toast.LENGTH_SHORT).show());
+            } catch (Exception e) {
+                Log.e("MainActivity", "Failed to export project", e);
+                runOnUiThread(() ->
+                        Toast.makeText(this, R.string.export_failed, Toast.LENGTH_SHORT).show());
+            }
         }).start();
     }
 
